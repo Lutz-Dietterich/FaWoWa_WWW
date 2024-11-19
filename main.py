@@ -122,23 +122,50 @@ def handle_client(s, espnow_data):
             <h1>ESP-NOW Sensordaten</h1>
             <p>Temperatur: {espnow_data['temperature']}°C</p>
             <p>Feuchtigkeit: {espnow_data['humidity']}%</p>
-            <h2>Sensordaten-Verlauf</h2>
-            <canvas id="dataChart" width="400" height="200"></canvas>
+            <h2>Temperatur-Verlauf</h2>
+            <canvas id="tempChart" width="400" height="200"></canvas>
+            <h2>Feuchtigkeits-Verlauf</h2>
+            <canvas id="humChart" width="400" height="200"></canvas>
             <script>
-                var ctx = document.getElementById('dataChart').getContext('2d');
-                var data = {{labels: [], datasets: [{{label: 'Temperatur (°C)', data: [], borderColor: 'red', fill: false}}, {{label: 'Feuchtigkeit (%)', data: [], borderColor: 'blue', fill: false}}]}};
+                var tempCtx = document.getElementById('tempChart').getContext('2d');
+                var humCtx = document.getElementById('humChart').getContext('2d');
+                
+                var tempData = {{labels: [], datasets: [{{label: 'Temperatur (°C)', data: [], borderColor: 'red', fill: false}}]}};
+                var humData = {{labels: [], datasets: [{{label: 'Feuchtigkeit (%)', data: [], borderColor: 'blue', fill: false}}]}};
 
                 var jsonData = {graph_data};
                 jsonData.forEach(function(item) {{
                     var date = new Date(item.timestamp * 1000);
-                    data.labels.push(moment(date).toISOString());
-                    data.datasets[0].data.push(item.temperature);
-                    data.datasets[1].data.push(item.humidity);
+                    var formattedDate = moment(date).toISOString();
+                    tempData.labels.push(formattedDate);
+                    humData.labels.push(formattedDate);
+                    tempData.datasets[0].data.push(item.temperature);
+                    humData.datasets[0].data.push(item.humidity);
                 }});
 
-                var myChart = new Chart(ctx, {{
+                var tempChart = new Chart(tempCtx, {{
                     type: 'line',
-                    data: data,
+                    data: tempData,
+                    options: {{
+                        responsive: true,
+                        scales: {{
+                            x: {{
+                                type: 'time',
+                                time: {{
+                                    unit: 'minute',
+                                    tooltipFormat: 'YYYY-MM-DDTHH:mm:ssZ'
+                                }}
+                            }},
+                            y: {{
+                                beginAtZero: true
+                            }}
+                        }}
+                    }}
+                }});
+
+                var humChart = new Chart(humCtx, {{
+                    type: 'line',
+                    data: humData,
                     options: {{
                         responsive: true,
                         scales: {{
