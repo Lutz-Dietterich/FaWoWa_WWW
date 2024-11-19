@@ -32,7 +32,7 @@ espnow_data = {'temperature': 'N/A', 'humidity': 'N/A'}
 # Funktion zum Speichern der Daten im Flash-Speicher
 def save_data_to_flash(espnow_data):
     try:
-        if not os.path.exists('data.json'):
+        if 'data.json' not in os.listdir():
             with open('data.json', 'w') as f:
                 json.dump([], f)  # Erstelle eine leere JSON-Liste
         
@@ -101,7 +101,7 @@ def handle_client(s, espnow_data):
         # Daten für den Graphen laden
         graph_data = []
         try:
-            if os.path.exists('data.json'):
+            if 'data.json' in os.listdir():
                 with open('data.json', 'r') as f:
                     graph_data = json.load(f)
         except Exception as e:
@@ -124,7 +124,7 @@ def handle_client(s, espnow_data):
             <canvas id="dataChart" width="400" height="200"></canvas>
             <script>
                 var ctx = document.getElementById('dataChart').getContext('2d');
-                var data = {labels: [], datasets: [{label: 'Temperatur (°C)', data: [], borderColor: 'red', fill: false}, {label: 'Feuchtigkeit (%)', data: [], borderColor: 'blue', fill: false}]};
+                var data = {{labels: [], datasets: [{{label: 'Temperatur (°C)', data: [], borderColor: 'red', fill: false}}, {{label: 'Feuchtigkeit (%)', data: [], borderColor: 'blue', fill: false}}]}};
 
                 var jsonData = {graph_data};
                 jsonData.forEach(function(item) {{
