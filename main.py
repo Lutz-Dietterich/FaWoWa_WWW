@@ -131,7 +131,7 @@ def handle_client(s, espnow_data):
                 var jsonData = {graph_data};
                 jsonData.forEach(function(item) {{
                     var date = new Date(item.timestamp * 1000);
-                    data.labels.push(moment(date).format('HH:mm:ss'));
+                    data.labels.push(moment(date).toISOString());
                     data.datasets[0].data.push(item.temperature);
                     data.datasets[1].data.push(item.humidity);
                 }});
@@ -146,7 +146,7 @@ def handle_client(s, espnow_data):
                                 type: 'time',
                                 time: {{
                                     unit: 'minute',
-                                    tooltipFormat: 'HH:mm:ss'
+                                    tooltipFormat: 'YYYY-MM-DDTHH:mm:ssZ'
                                 }}
                             }},
                             y: {{
