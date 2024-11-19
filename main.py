@@ -114,7 +114,9 @@ def handle_client(s, espnow_data):
             <title>ESP-NOW & Webserver</title>
             <meta charset="UTF-8">  <!-- Sicherstellen, dass UTF-8 verwendet wird -->
             <meta http-equiv="refresh" content="5">
+            <script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/min/moment.min.js"></script>
             <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
         </head>
         <body>
             <h1>ESP-NOW Sensordaten</h1>
@@ -129,7 +131,7 @@ def handle_client(s, espnow_data):
                 var jsonData = {graph_data};
                 jsonData.forEach(function(item) {{
                     var date = new Date(item.timestamp * 1000);
-                    data.labels.push(date.toLocaleTimeString());
+                    data.labels.push(moment(date).format('HH:mm:ss'));
                     data.datasets[0].data.push(item.temperature);
                     data.datasets[1].data.push(item.humidity);
                 }});
@@ -137,7 +139,21 @@ def handle_client(s, espnow_data):
                 var myChart = new Chart(ctx, {{
                     type: 'line',
                     data: data,
-                    options: {{responsive: true, scales: {{x: {{type: 'time', time: {{unit: 'minute'}}}}, y: {{beginAtZero: true}}}}}}
+                    options: {{
+                        responsive: true,
+                        scales: {{
+                            x: {{
+                                type: 'time',
+                                time: {{
+                                    unit: 'minute',
+                                    tooltipFormat: 'HH:mm:ss'
+                                }}
+                            }},
+                            y: {{
+                                beginAtZero: true
+                            }}
+                        }}
+                    }}
                 }});
             </script>
         </body>
