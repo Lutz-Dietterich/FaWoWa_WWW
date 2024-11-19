@@ -59,8 +59,8 @@ def check_espnow(e, espnow_data):
                     try:
                         temp_str = message.split("Temperatur: ")[1].split("\u00b0C")[0]
                         hum_str = message.split("Luftfeuchtigkeit: ")[1].split("%")[0]
-                        espnow_data['temperature'] = temp_str
-                        espnow_data['humidity'] = hum_str
+                        espnow_data['temperature'] = float(temp_str)
+                        espnow_data['humidity'] = float(hum_str)
                         print(f"Empfangene Temperatur: {espnow_data['temperature']}\u00b0C")
                         print(f"Empfangene Feuchtigkeit: {espnow_data['humidity']}%")
                         save_data_to_flash(espnow_data)  # Speichern der Daten im Flash-Speicher
@@ -139,8 +139,8 @@ def handle_client(s, espnow_data):
                     var formattedDate = moment(date).toISOString();
                     tempData.labels.push(formattedDate);
                     humData.labels.push(formattedDate);
-                    tempData.datasets[0].data.push(item.temperature);
-                    humData.datasets[0].data.push(item.humidity);
+                    tempData.datasets[0].data.push(parseFloat(item.temperature));
+                    humData.datasets[0].data.push(parseFloat(item.humidity));
                 }});
 
                 var tempChart = new Chart(tempCtx, {{
