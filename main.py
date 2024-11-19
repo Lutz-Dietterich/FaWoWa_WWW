@@ -157,7 +157,11 @@ def handle_client(s, espnow_data):
                                 }}
                             }},
                             y: {{
-                                beginAtZero: true
+                                min: -5,
+                                max: 50,
+                                ticks: {{
+                                    stepSize: 5
+                                }}
                             }}
                         }}
                     }}
