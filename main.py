@@ -1,8 +1,11 @@
-# main.py -- put your code here!import network
+# main.py -- put your code here!
+import network
 import network
 import espnow
 import time
 import socket
+import ujson as json
+import os
 
 # Funktion zum Initialisieren von ESP-NOW
 def init_espnow():
@@ -26,6 +29,24 @@ except Exception as ex:
 # Variable zum Speichern der empfangenen Daten
 espnow_data = {'temperature': 'N/A', 'humidity': 'N/A'}
 
+# Funktion zum Speichern der Daten im Flash-Speicher
+def save_data_to_flash(espnow_data):
+    try:
+        if not os.path.exists('data.json'):
+            with open('data.json', 'w') as f:
+                json.dump([], f)  # Erstelle eine leere JSON-Liste
+        
+        with open('data.json', 'r') as f:
+            data = json.load(f)
+        
+        data.append({'timestamp': time.time(), 'temperature': espnow_data['temperature'], 'humidity': espnow_data['humidity']})
+        
+        with open('data.json', 'w') as f:
+            json.dump(data, f)
+        print("Daten erfolgreich im Flash-Speicher gespeichert.")
+    except Exception as e:
+        print(f"Fehler beim Speichern der Daten: {e}")
+
 # Funktion zum Empfangen von ESP-NOW Nachrichten
 def check_espnow(e, espnow_data):
     if e.any():  # Prüfen, ob Nachrichten vorhanden sind
@@ -36,12 +57,13 @@ def check_espnow(e, espnow_data):
                 print(f'Nachricht von {peer}: {message}')
                 if "Temperatur" in message:
                     try:
-                        temp_str = message.split("Temperatur: ")[1].split("°C")[0]
+                        temp_str = message.split("Temperatur: ")[1].split("\u00b0C")[0]
                         hum_str = message.split("Luftfeuchtigkeit: ")[1].split("%")[0]
                         espnow_data['temperature'] = temp_str
                         espnow_data['humidity'] = hum_str
-                        print(f"Empfangene Temperatur: {espnow_data['temperature']}°C")
+                        print(f"Empfangene Temperatur: {espnow_data['temperature']}\u00b0C")
                         print(f"Empfangene Feuchtigkeit: {espnow_data['humidity']}%")
+                        save_data_to_flash(espnow_data)  # Speichern der Daten im Flash-Speicher
                         return True  # Daten empfangen, kann mit WLAN und Webserver fortfahren
                     except (IndexError, ValueError) as e:
                         print(f"Fehler beim Verarbeiten der Nachricht: {e}")
@@ -76,6 +98,15 @@ def handle_client(s, espnow_data):
         request = cl.recv(1024).decode()
         print(request)
 
+        # Daten für den Graphen laden
+        graph_data = []
+        try:
+            if os.path.exists('data.json'):
+                with open('data.json', 'r') as f:
+                    graph_data = json.load(f)
+        except Exception as e:
+            print(f"Fehler beim Laden der Daten: {e}")
+
         # HTML-Seite generieren
         response = f"""
         <html>
@@ -83,11 +114,32 @@ def handle_client(s, espnow_data):
             <title>ESP-NOW & Webserver</title>
             <meta charset="UTF-8">  <!-- Sicherstellen, dass UTF-8 verwendet wird -->
             <meta http-equiv="refresh" content="5">
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         </head>
         <body>
             <h1>ESP-NOW Sensordaten</h1>
             <p>Temperatur: {espnow_data['temperature']}°C</p>
             <p>Feuchtigkeit: {espnow_data['humidity']}%</p>
+            <h2>Sensordaten-Verlauf</h2>
+            <canvas id="dataChart" width="400" height="200"></canvas>
+            <script>
+                var ctx = document.getElementById('dataChart').getContext('2d');
+                var data = {labels: [], datasets: [{label: 'Temperatur (°C)', data: [], borderColor: 'red', fill: false}, {label: 'Feuchtigkeit (%)', data: [], borderColor: 'blue', fill: false}]};
+
+                var jsonData = {graph_data};
+                jsonData.forEach(function(item) {{
+                    var date = new Date(item.timestamp * 1000);
+                    data.labels.push(date.toLocaleTimeString());
+                    data.datasets[0].data.push(item.temperature);
+                    data.datasets[1].data.push(item.humidity);
+                }});
+
+                var myChart = new Chart(ctx, {{
+                    type: 'line',
+                    data: data,
+                    options: {{responsive: true, scales: {{x: {{type: 'time', time: {{unit: 'minute'}}}}, y: {{beginAtZero: true}}}}}}
+                }});
+            </script>
         </body>
         </html>
         """
@@ -171,4 +223,3 @@ while True:
         print(f"Fehler beim Hinzufügen des Peers: {ex}")
 
     time.sleep(1)  # Pause, bevor erneut auf ESP-NOW-Daten gewartet wird
-
