@@ -114,8 +114,8 @@ def handle_client(s, espnow_data):
                 print(f"Fehler beim Laden der Daten: {e}")
 
             # JSON-Daten an den Client senden
-            cl.send('HTTP/1.1 200 OK')
-            cl.send('Content-Type: application/json')
+            cl.send('HTTP/1.1 200 OK\r\n')
+            cl.send('Content-Type: application/json\r\n')
             cl.send('Connection: close\r\n\r\n')
             cl.sendall(json.dumps(graph_data))
             cl.close()
@@ -142,8 +142,8 @@ def handle_client(s, espnow_data):
         </head>
         <body>
             <h1>ESP-NOW Sensordaten</h1>
-            <p>Temperatur: {espnow_data['temperature']}°C</p>
-            <p>Feuchtigkeit: {espnow_data['humidity']}%</p>
+            <p>Temperatur: <span id="currentTemperature">{espnow_data['temperature']}°C</span></p>
+            <p>Feuchtigkeit: <span id="currentHumidity">{espnow_data['humidity']}%</span></p>
             <h2>Temperatur-Verlauf</h2>
             <canvas id="tempChart" width="400" height="200"></canvas>
             <h2>Feuchtigkeits-Verlauf</h2>
@@ -213,6 +213,13 @@ def handle_client(s, espnow_data):
                     fetch('/data.json')
                         .then(response => response.json())
                         .then(jsonData => {{
+                            // Aktuelle Temperatur- und Feuchtigkeitswerte aktualisieren
+                            if (jsonData.length > 0) {{
+                                var latestData = jsonData[jsonData.length - 1];
+                                document.getElementById('currentTemperature').innerText = latestData.temperature + '°C';
+                                document.getElementById('currentHumidity').innerText = latestData.humidity + '%';
+                            }}
+
                             tempData.labels = [];
                             tempData.datasets[0].data = [];
                             humData.labels = [];
