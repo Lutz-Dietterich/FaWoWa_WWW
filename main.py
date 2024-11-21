@@ -64,7 +64,7 @@ def check_espnow(e, espnow_data):
                         hum_str = message.split("Luftfeuchtigkeit: ")[1].split("%")[0]
                         espnow_data['temperature'] = float(temp_str)  # Temperatur als Float speichern, damit keine Probleme beim Parsen auftreten
                         espnow_data['humidity'] = hum_str
-                        print(f"Empfangene Temperatur: {espnow_data['temperature']}°C")
+                        print(f"Empfangene Temperatur: {espnow_data['temperature']}\u00b0C")
                         print(f"Empfangene Feuchtigkeit: {espnow_data['humidity']}%")
                         save_data_to_flash(espnow_data)  # Speichern der Daten im Flash-Speicher
                         
@@ -95,6 +95,7 @@ def start_webserver(espnow_data):
 
 # Funktion zum Verarbeiten von Client-Anfragen
 def handle_client(s, espnow_data):
+    cl = None
     try:
         s.settimeout(2)  # Erhöhe den Timeout auf 2 Sekunden, damit der Server nicht zu schnell blockiert
         cl, addr = s.accept()
@@ -114,11 +115,11 @@ def handle_client(s, espnow_data):
                 print(f"Fehler beim Laden der Daten: {e}")
 
             # JSON-Daten an den Client senden
-            cl.send('HTTP/1.1 200 OK\r\n')
+            cl.send('HTTP/1.1 200 OK')
+            cl.send('Access-Control-Allow-Origin: *\r\n')
             cl.send('Content-Type: application/json\r\n')
             cl.send('Connection: close\r\n\r\n')
             cl.sendall(json.dumps(graph_data))
-            cl.close()
             return
 
         # Daten für den Graphen laden
@@ -142,7 +143,7 @@ def handle_client(s, espnow_data):
         </head>
         <body>
             <h1>ESP-NOW Sensordaten</h1>
-            <p>Temperatur: <span id="currentTemperature">{espnow_data['temperature']}°C</span></p>
+            <p>Temperatur: <span id="currentTemperature">{espnow_data['temperature']}\u00b0C</span></p>
             <p>Feuchtigkeit: <span id="currentHumidity">{espnow_data['humidity']}%</span></p>
             <h2>Temperatur-Verlauf</h2>
             <canvas id="tempChart" width="400" height="200"></canvas>
@@ -152,7 +153,7 @@ def handle_client(s, espnow_data):
                 var tempCtx = document.getElementById('tempChart').getContext('2d');
                 var humCtx = document.getElementById('humChart').getContext('2d');
                 
-                var tempData = {{labels: [], datasets: [{{label: 'Temperatur (°C)', data: [], borderColor: 'red', fill: false}}]}};
+                var tempData = {{labels: [], datasets: [{{label: 'Temperatur (\u00b0C)', data: [], borderColor: 'red', fill: false}}]}};
                 var humData = {{labels: [], datasets: [{{label: 'Feuchtigkeit (%)', data: [], borderColor: 'blue', fill: false}}]}};
 
                 var jsonData = {graph_data};
@@ -216,7 +217,7 @@ def handle_client(s, espnow_data):
                             // Aktuelle Temperatur- und Feuchtigkeitswerte aktualisieren
                             if (jsonData.length > 0) {{
                                 var latestData = jsonData[jsonData.length - 1];
-                                document.getElementById('currentTemperature').innerText = latestData.temperature + '°C';
+                                document.getElementById('currentTemperature').innerText = latestData.temperature + '\u00b0C';
                                 document.getElementById('currentHumidity').innerText = latestData.humidity + '%';
                             }}
 
@@ -246,15 +247,17 @@ def handle_client(s, espnow_data):
 
         cl.send('HTTP/1.1 200 OK\r\n')
         cl.send('Content-Type: text/html\r\n')
+        cl.send('Access-Control-Allow-Origin: *\r\n')
         cl.send('Connection: close\r\n\r\n')
         cl.sendall(response)
-        cl.close()
-
-        # Speicher bereinigen
-        gc.collect()  # Markierung: Garbage Collector wird aktiviert, um RAM nach Client-Anfrage zu bereinigen
     except OSError as e:
         # Wenn kein Client verbunden ist oder Timeout abläuft, passiert nichts
         pass
+    finally:
+        if cl:
+            cl.close()
+        # Speicher bereinigen
+        gc.collect()  # Markierung: Garbage Collector wird aktiviert, um RAM nach Client-Anfrage zu bereinigen
 
 # WLAN verbinden
 def connect_wifi(ssid, password):
@@ -288,7 +291,14 @@ def disconnect_wifi():
 while True:
     print("Warte auf ESP-NOW-Daten...")
 
-    while not check_espnow(e, espnow_data):  # Warte auf ESP-NOW-Daten
+    max_retries = 100
+    retries = 0
+    while retries < max_retries and not check_espnow(e, espnow_data):  # Warte auf ESP-NOW-Daten
+        time.sleep(1)
+        retries += 1
+    if retries >= max_retries:
+        print("Maximale Anzahl an Versuchen überschritten, Neustart erforderlich.")
+        continue  # Neustart der Hauptschleife
         time.sleep(1)
 
     print("Daten empfangen, WLAN wird verbunden.")
@@ -300,7 +310,7 @@ while True:
 
     # Entferne den Peer vor dem WLAN-Verbindungsaufbau
     e.active(False)
-    time.sleep(1)  # Kleines Delay, um ESP-NOW korrekt zu deaktivieren
+    time.sleep(3)  # Erhöhen des Delays, um ESP-NOW korrekt zu deaktivieren
 
     ip_address = connect_wifi(ssid, password)  # Verbinde mit WLAN
 
@@ -311,13 +321,14 @@ while True:
         if server_socket is not None:
             start_time = time.time()
             # Countdown von 45 Sekunden
-            while time.time() - start_time < 45:
-                handle_client(server_socket, espnow_data)  # Verarbeite Client-Anfragen
-                time.sleep(1)  # Kurz warten, um die Schleife nicht zu überlasten
-
-            print("45 Sekunden abgelaufen, Webserver wird gestoppt.")
-            server_socket.close()  # Schließe den Webserver
-            disconnect_wifi()  # WLAN trennen
+            try:
+                while time.time() - start_time < 45:
+                    handle_client(server_socket, espnow_data)  # Verarbeite Client-Anfragen
+                    time.sleep(1)  # Kurz warten, um die Schleife nicht zu überlasten
+            finally:
+                print("45 Sekunden abgelaufen, Webserver wird gestoppt.")
+                server_socket.close()  # Schließe den Webserver
+                disconnect_wifi()  # WLAN trennen
 
     # Nach Trennung ESP-NOW wieder aktivieren
     e = init_espnow()
