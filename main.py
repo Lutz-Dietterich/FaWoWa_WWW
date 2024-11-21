@@ -64,7 +64,7 @@ def check_espnow(e, espnow_data):
                         hum_str = message.split("Luftfeuchtigkeit: ")[1].split("%")[0]
                         espnow_data['temperature'] = float(temp_str)  # Temperatur als Float speichern, damit keine Probleme beim Parsen auftreten
                         espnow_data['humidity'] = hum_str
-                        print(f"Empfangene Temperatur: {espnow_data['temperature']}\u00b0C")
+                        print(f"Empfangene Temperatur: {espnow_data['temperature']}°C")
                         print(f"Empfangene Feuchtigkeit: {espnow_data['humidity']}%")
                         save_data_to_flash(espnow_data)  # Speichern der Daten im Flash-Speicher
                         
@@ -102,6 +102,25 @@ def handle_client(s, espnow_data):
         request = cl.recv(1024).decode()
         print(request)
 
+        # Prüfen, ob die Anfrage nach '/data.json' erfolgt
+        if request.startswith('GET /data.json'):
+            # Daten für JSON-Antwort laden
+            graph_data = []
+            try:
+                if 'data.json' in os.listdir():
+                    with open('data.json', 'r') as f:
+                        graph_data = json.load(f)
+            except Exception as e:
+                print(f"Fehler beim Laden der Daten: {e}")
+
+            # JSON-Daten an den Client senden
+            cl.send('HTTP/1.1 200 OK')
+            cl.send('Content-Type: application/json')
+            cl.send('Connection: close\r\n\r\n')
+            cl.sendall(json.dumps(graph_data))
+            cl.close()
+            return
+
         # Daten für den Graphen laden
         graph_data = []
         try:
@@ -117,7 +136,6 @@ def handle_client(s, espnow_data):
         <head>
             <title>ESP-NOW & Webserver</title>
             <meta charset="UTF-8">  <!-- Sicherstellen, dass UTF-8 verwendet wird -->
-            <meta http-equiv="refresh" content="5">
             <script src="https://cdn.jsdelivr.net/npm/moment@2.29.1/min/moment.min.js"></script>
             <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
             <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment@1.0.0"></script>
@@ -190,6 +208,30 @@ def handle_client(s, espnow_data):
                         }}
                     }}
                 }});
+
+                setInterval(function() {{
+                    fetch('/data.json')
+                        .then(response => response.json())
+                        .then(jsonData => {{
+                            tempData.labels = [];
+                            tempData.datasets[0].data = [];
+                            humData.labels = [];
+                            humData.datasets[0].data = [];
+                            
+                            jsonData.forEach(function(item) {{
+                                var date = new Date(item.timestamp * 1000);
+                                var formattedDate = moment(date).toISOString();
+                                tempData.labels.push(formattedDate);
+                                humData.labels.push(formattedDate);
+                                tempData.datasets[0].data.push(item.temperature);
+                                humData.datasets[0].data.push(item.humidity);
+                            }});
+                            
+                            tempChart.update();
+                            humChart.update();
+                        }})
+                        .catch(error => console.error('Fehler beim Abrufen der Daten:', error));
+                }}, 5000);  // Alle 5 Sekunden abrufen
             </script>
         </body>
         </html>
