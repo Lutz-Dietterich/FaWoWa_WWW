@@ -1,11 +1,11 @@
 # main.py -- put your code here!
-import network
+import os
 import network
 import espnow
 import time
 import socket
 import ujson as json
-import os
+import gc  # Importiere Garbage Collector
 
 # Funktion zum Initialisieren von ESP-NOW
 def init_espnow():
@@ -44,6 +44,9 @@ def save_data_to_flash(espnow_data):
         with open('data.json', 'w') as f:
             json.dump(data, f)
         print("Daten erfolgreich im Flash-Speicher gespeichert.")
+        
+        # Speicher bereinigen
+        gc.collect()  # Markierung: Garbage Collector wird aktiviert, um RAM zu bereinigen
     except Exception as e:
         print(f"Fehler beim Speichern der Daten: {e}")
 
@@ -57,13 +60,14 @@ def check_espnow(e, espnow_data):
                 print(f'Nachricht von {peer}: {message}')
                 if "Temperatur" in message:
                     try:
-                        temp_str = message.split("Temperatur: ")[1].split("\u00b0C")[0]
+                        temp_str = message.split("Temperatur: ")[1].split("C")[0].strip()  # Entfernt das 'C' am Ende der Temperatur
                         hum_str = message.split("Luftfeuchtigkeit: ")[1].split("%")[0]
-                        espnow_data['temperature'] = temp_str
+                        espnow_data['temperature'] = float(temp_str)  # Temperatur als Float speichern, damit keine Probleme beim Parsen auftreten
                         espnow_data['humidity'] = hum_str
                         print(f"Empfangene Temperatur: {espnow_data['temperature']}\u00b0C")
                         print(f"Empfangene Feuchtigkeit: {espnow_data['humidity']}%")
                         save_data_to_flash(espnow_data)  # Speichern der Daten im Flash-Speicher
+                        
                         return True  # Daten empfangen, kann mit WLAN und Webserver fortfahren
                     except (IndexError, ValueError) as e:
                         print(f"Fehler beim Verarbeiten der Nachricht: {e}")
@@ -92,7 +96,7 @@ def start_webserver(espnow_data):
 # Funktion zum Verarbeiten von Client-Anfragen
 def handle_client(s, espnow_data):
     try:
-        s.settimeout(0.5)  # Setze einen kurzen Timeout, damit der Server nicht blockiert
+        s.settimeout(2)  # Erhöhe den Timeout auf 2 Sekunden, damit der Server nicht zu schnell blockiert
         cl, addr = s.accept()
         print('Client verbunden von', addr)
         request = cl.recv(1024).decode()
@@ -196,6 +200,9 @@ def handle_client(s, espnow_data):
         cl.send('Connection: close\r\n\r\n')
         cl.sendall(response)
         cl.close()
+
+        # Speicher bereinigen
+        gc.collect()  # Markierung: Garbage Collector wird aktiviert, um RAM nach Client-Anfrage zu bereinigen
     except OSError as e:
         # Wenn kein Client verbunden ist oder Timeout abläuft, passiert nichts
         pass
@@ -236,6 +243,7 @@ while True:
         time.sleep(1)
 
     print("Daten empfangen, WLAN wird verbunden.")
+    
 
     # WLAN-Zugangsdaten
     ssid = 'NTGR_05C1'
@@ -268,5 +276,7 @@ while True:
         e.add_peer(peer)
     except Exception as ex:
         print(f"Fehler beim Hinzufügen des Peers: {ex}")
+        
+        
 
     time.sleep(1)  # Pause, bevor erneut auf ESP-NOW-Daten gewartet wird
